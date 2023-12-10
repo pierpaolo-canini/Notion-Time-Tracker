@@ -1,1 +1,1 @@
-# Notion-Time-Tracker
+# Notion Time Tracker
