@@ -18,6 +18,7 @@ Create a Notion Integration with read and write permissions and add it to the Pr
 Paste the integration secret in the setup.gs file
 Paste the Project database id in the setup.gs file
 
+it's easy to get the id if you're using Notion from the browser
 ![64967fd-small-62e5027-notion_database_id](https://github.com/pierpaolo-canini/Notion-Time-Tracker/assets/52198643/ba322fd2-c96c-4b46-a618-20fc88299feb)
 
 Paste the Time Entries database id in the setup.gs file
