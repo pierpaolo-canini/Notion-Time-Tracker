@@ -1,0 +1,234 @@
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous">
+</script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://momentjs.com/downloads/moment-with-locales.min.js"></script>
+<script>
+
+//startup code
+let param = ##GLOBALPAR##
+let activeProjStart = param.activeProjStart
+let activeProj = param.activeProj
+let appUrl = param.appUrl
+const timerElement = document.getElementById("elapsed")
+const stopTimerButton = document.getElementById('stopTimerButton')
+const projnameString = document.getElementById('projName')
+const startedTimeString = document.getElementById('startedTimer')
+const descriptionTextArea = document.getElementById('descriptionTextArea')
+const usedDescriptionsAlert = document.getElementById('usedDescriptionsAlert')
+const usedDescriptions = document.getElementById('usedDescriptions')
+const activeProjSpinners = document.getElementsByClassName('col-sm activeProjSpinner')
+const accentGrey = "#8c8c8d"
+
+let placeholderDescription = '<ul class="list-group" style="padding: 15px"><li class="list-group-item list-group-item-action text-center usedDescriptionListRow" data-content="placeholder"><small style=" text-align: center;">-- no descriptions available --</small></li></ul>'
+
+usedDescriptions.innerHTML = placeholderDescription
+checkActiveSpinner()
+backEndGetUsedDescriptions()
+if (activeProjStart == null) {
+  stopTimerButton.hidden = true
+}
+updateTimer()
+
+//timer functions
+function updateTimer() {
+  if (activeProjStart != null) {
+    let baseDate = new Date(activeProjStart)
+    let now = new Date()
+    let dif = now.getTime() - baseDate.getTime()
+    let seconds = dif / 1000;
+    timerElement.innerHTML = toHHMMSS(dif / 1000);
+    startedTimeString.innerHTML = formatISODates(baseDate)
+    setTimeout(updateTimer, 1000);
+  }
+}
+
+function stopTimer() {
+  timerElement.innerHTML = "---"
+  projnameString.innerHTML = "---"
+  startedTimeString.innerHTML = "---"
+  descriptionTextArea.value = "---"
+  usedDescriptions.innerHTML = placeholderDescription
+  stopTimerButton.hidden = true
+  activeProjStart = null
+  updateTimer()
+  backEndStopTimer()
+  activeProj = null
+  checkActiveSpinner()
+}
+
+async function backEndStopTimer() {
+  const e = await new Promise(r => {
+    google.script.run.withSuccessHandler(r).stopTimer();
+  })
+}
+
+function startNewTimer(projId) {
+  if (projId != activeProj) {
+    let currTS = toIsoUTCOffsetString(new Date())
+    projnameString.innerHTML = projId
+    activeProjStart = currTS
+    startedTimeString.innerHTML = currTS
+    descriptionTextArea.value = "---"
+    usedDescriptions.innerHTML = placeholderDescription
+    stopTimerButton.hidden = false
+    updateTimer()
+    activeProj = projId
+    backEndstartNewTimer(projId, currTS)
+  }
+}
+
+async function backEndstartNewTimer(projId, currTS) {
+  checkActiveSpinner()
+  let activeProjSpinner = getSpinnerByProj(projId)
+  activeProjSpinner.innerHTML = '<div class="spinner-border spinner-border-sm text-secondary" role="status"></div>'
+  timerElement.style.color = accentGrey
+  stopTimerButton.disabled = true
+  descriptionTextArea.disabled = true
+  projnameString.style.color = accentGrey
+  startedTimeString.style.color = accentGrey
+  descriptionTextArea.style.color = accentGrey
+  const e = await new Promise(r => {
+    google.script.run.withSuccessHandler(r).startNewTimer(projId, currTS);
+  })
+  checkActiveSpinner()
+  backEndGetUsedDescriptions()
+  timerElement.style.color = "inherit"
+  stopTimerButton.disabled = false
+  descriptionTextArea.disabled = false
+  projnameString.style.color = "inherit"
+  startedTimeString.style.color = "inherit"
+  descriptionTextArea.style.color = "inherit"
+}
+
+async function backEndUpdateDescription(des) {
+  if (activeProj != null){
+    updatedAlert.innerHTML = '<div class="spinner-border spinner-border-sm text-success" role="status"></div>'
+    const e = await new Promise(r => {
+    google.script.run.withSuccessHandler(r).updateDescription(des);
+    })
+    updatedAlert.innerHTML = '<small style="color: #8c8c8d;">updated</small>'
+    waitDelay(2000).then(() => updatedAlert.innerHTML = '')
+  }
+}
+
+// ui functions
+function checkActiveSpinner() {
+  let activeProjSpinner = null
+  for (let i = 0; i < activeProjSpinners.length; i++) {
+    let currentSpinner = activeProjSpinners[i]
+    currentSpinner.innerHTML = ""
+    let currSpinnerProj = currentSpinner.getAttribute("data-projId")
+    if (currSpinnerProj == activeProj) {
+      activeProjSpinner = activeProjSpinners[i]
+      activeProjSpinner.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clock" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>'
+    }
+  }
+  return activeProjSpinner
+}
+
+async function backEndGetUsedDescriptions() {
+  const e = await new Promise(r => {
+    google.script.run.withSuccessHandler(r).getPreviousDescriptions(activeProj);
+  })
+  if (e != null){
+    let usedDes = e[0]
+    let usedDesHtml = e[1]
+    if (usedDes.length>0){
+    usedDescriptions.innerHTML = usedDesHtml
+  }
+  }
+}
+
+function getSpinnerByProj(projId) {
+  let spinner = null
+  for (let i = 0; i < activeProjSpinners.length; i++) {
+    let currentSpinner = activeProjSpinners[i]
+    let currSpinnerProj = currentSpinner.getAttribute("data-projId")
+    if (currSpinnerProj == projId) {
+      spinner = currentSpinner
+    }
+  }
+  return spinner
+}
+
+// actions
+$('#descriptionTextArea').keyup(delay(function (e) {
+  let textContent = descriptionTextArea.value
+  backEndUpdateDescription(textContent)
+}, 500))
+
+$(document).on('click', ".usedDescriptionListRow", function () {
+  let content = $(this).attr('data-content').replaceAll('<br>', "\n")
+  if (content!="placeholder"){
+      descriptionTextArea.value  = content
+      backEndUpdateDescription(content)
+  }
+})
+
+$('.projectList').on('click', function () {
+  let projId = $(this).attr('data-projId')
+  startNewTimer(projId)
+})
+
+$('.projLink').on('click', function () {
+  let projId = $(this).attr('data-projId')
+  let spinner = getSpinnerByProj(projId)
+  let spinnerHtml = spinner.innerHTML
+  navigator.clipboard.writeText(appUrl+"?projId="+projId)
+  spinner.innerHTML = '<div class="text-success"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-clipboard" viewBox="0 0 16 16"><path d="M4 1.5H3a2 2 0 0 0-2 2V14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V3.5a2 2 0 0 0-2-2h-1v1h1a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1h1v-1z"/><path d="M9.5 1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1a.5.5 0 0 1 .5-.5h3zm-3-1A1.5 1.5 0 0 0 5 1.5v1A1.5 1.5 0 0 0 6.5 4h3A1.5 1.5 0 0 0 11 2.5v-1A1.5 1.5 0 0 0 9.5 0h-3z"/></svg></div>'
+  waitDelay(1000).then(() => spinner.innerHTML = spinnerHtml)
+})
+
+
+//utility functions
+
+function toHHMMSS(secs) {
+  var sec_num = parseInt(secs, 10)
+  var hours = Math.floor(sec_num / 3600)
+  var minutes = Math.floor(sec_num / 60) % 60
+  var seconds = sec_num % 60
+
+  return [hours, minutes, seconds]
+    .map(v => v < 10 ? "0" + v : v)
+    .filter((v, i) => v !== "00" || i > 0)
+    .join(":")
+}
+
+function formatISODates(date) {
+  let formatted = moment(date).format('DD/MM/YYYY HH:mm:ss')
+  return formatted
+}
+
+function delay(callback, ms) {
+  var timer = 0;
+  return function () {
+    var context = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      callback.apply(context, args);
+    }, ms || 0);
+  };
+}
+
+function toIsoUTCOffsetString(date) {
+  var tzo = -date.getTimezoneOffset(),
+    dif = tzo >= 0 ? '+' : '-',
+    pad = function (num) {
+      return (num < 10 ? '0' : '') + num;
+    };
+
+  return date.getFullYear() +
+    '-' + pad(date.getMonth() + 1) +
+    '-' + pad(date.getDate()) +
+    'T' + pad(date.getHours()) +
+    ':' + pad(date.getMinutes()) +
+    ':' + pad(date.getSeconds()) +
+    dif + pad(Math.floor(Math.abs(tzo) / 60)) +
+    ':' + pad(Math.abs(tzo) % 60);
+}
+
+function waitDelay(time) {
+  return new Promise(resolve => setTimeout(resolve, time));
+}
+</script>
